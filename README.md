@@ -46,8 +46,8 @@ How to get it: run the API call in Data_Process.py
 ├── LICENSE
 └── README.md
 ```
-
-## Exploratory Data Analysis (I don't know whether we need this part here? - XZ)
+<!-- THIS PART IS TEMPORARILY COMMENTED OUT
+## Exploratory Data Analysis
 
 Our exploratory analysis identified three findings that guide the modeling plan.
 
@@ -64,6 +64,7 @@ Missing values are associated with higher denial rates. Applications without a r
 Applicant and loan characteristics changed across years, while overall denial rates remained relatively stable. The median loan amount increased from $275,000 in the training years to $375,000 in 2024.
 
 These changes motivate evaluating how well models generalize to later applications.
+-->
 
 ## Environment
 
