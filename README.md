@@ -32,8 +32,9 @@ The dataset contains 94,870 not-denied applications (90.54%) and 9,909 denied ap
 
 How to get it: run the API call in Data_Process.py
 
-## Repository Structure 
+## Repository Structure
 
+```text
 ├── data/
 │   ├── raw/            # downloaded HMDA files
 │   └── processed/      # cleaned data
@@ -44,6 +45,7 @@ How to get it: run the API call in Data_Process.py
 ├── .gitignore
 ├── LICENSE
 └── README.md
+```
 
 ## Exploratory Data Analysis (I don't know whether we need this part here? - XZ)
 
