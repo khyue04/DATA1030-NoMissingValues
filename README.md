@@ -9,9 +9,17 @@ This project aims to predict whether a home-purchase mortgage application in Rho
 
 We plan to compare machine learning models, identify features that contribute most to their predictions, and evaluate how well models trained on earlier years perform on later applications.
 
+Why Rhode Island? RI is the community we live in; a state-level model reflects local lenders, prices, and neighborhoods.
+
+Intended users: lenders for second-look review, regulators and fair-housing groups for auditing, and housing counselors for pre-application checks.
+
+Key results: [to be completed]
+
 ## Dataset
 
-We use publicly available HMDA data from the [Consumer Financial Protection Bureau (CFPB)](https://ffiec.cfpb.gov/data-browser/), covering home-purchase mortgage applications in Rhode Island from 2018 to 2024.
+We use publicly available HMDA data from the [Consumer Financial Protection Bureau (CFPB)](https://ffiec.cfpb.gov/data-browser/)
+
+Scope: state = RI, years = 2018 - 2024, loan_type = 1, action_taken: 1, 2, 3
 
 After filtering for eligible application outcomes, the dataset contains **104,779 records**.
 
@@ -22,7 +30,22 @@ The binary target variable, `Denied`, is defined as:
 
 The dataset contains 94,870 not-denied applications (90.54%) and 9,909 denied applications (9.46%).
 
-## Exploratory Data Analysis
+How to get it: run the API call in Data_Process.py
+
+## Repository Structure 
+
+├── data/
+│   ├── raw/            # downloaded HMDA files
+│   └── processed/      # cleaned data
+├── figures/            # saved plots
+├── reports/            # midterm & final reports
+├── results/            # model outputs, metrics
+├── src/                # python scripts (download, preprocessing, modeling)
+├── .gitignore
+├── LICENSE
+└── README.md
+
+## Exploratory Data Analysis (I don't know whether we need this part here? - XZ)
 
 Our exploratory analysis identified three findings that guide the modeling plan.
 
