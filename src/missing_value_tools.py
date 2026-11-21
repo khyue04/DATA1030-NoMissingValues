@@ -37,6 +37,7 @@ def read_split(path):
     df = pd.read_csv(path, dtype=str, keep_default_na=False)
     for col in continuous_ftrs:
         df[col] = pd.to_numeric(df[col].replace(['', 'NA', 'Exempt'], np.nan))
+    df['activity_year'] = df['activity_year'].astype(int)  # read the year as a number
     df['denied'] = df['denied'].astype(int)
     return df
 
