@@ -2,48 +2,79 @@ import numpy as np
 import pandas as pd
 import requests as rq
 from pathlib import Path
-from sklearn.model_selection import train_test_split
 
 url = 'https://ffiec.cfpb.gov/v2/data-browser-api/view/csv'
 
 yearly_data = []
+data_dir = Path(__file__).resolve().parent.parent / "data"
+data_dir.mkdir(parents=True, exist_ok=True)
 
 for year in range(2018, 2025):
-    params = {
-        'years': str(year),
-        'states': 'RI',
-        'loan_purposes': '1' # Home purchase
-    }
+    csv_path = data_dir / f"hmda_{year}_RI.csv"
 
-    results = rq.get(
-        url,
-        params = params
-    )
-    print(year, results)
-
-    # Check whether sucessfully requested, and saved as csv file
-    csv_path = Path(__file__).resolve().parent / f"hmda_{year}_RI.csv" # Build the path to the csv file in the same directory as this script
-
-    if results.status_code == 200:
-        with open(csv_path, 'wb') as file: # Write binary to avoid encoding issues
-            file.write(results.content)
-
-            print('Saved to:', csv_path)
+    if csv_path.exists():
+        print(f"{year}: loading existing file: {csv_path.name}")
 
     else:
-        print('Response code:', results.status_code)
-        print('Error message:', results.content)
-        raise ValueError('The API request was unsucessful!')
+        params = {
+            "years": str(year),
+            "states": "RI",
+            "loan_purposes": "1"
+        }
 
-    # Load csv file and check the year
+        print(f"{year}: downloading...")
+
+        response = rq.get(
+            url,
+            params=params,
+            timeout=180
+        )
+
+        if response.status_code == 403:
+            raise RuntimeError(
+                f"The HMDA server refused the {year} download (HTTP 403). "
+                f"Download that year's Rhode Island home-purchase CSV "
+                f"through the HMDA Data Browser and save it as:\n{csv_path}"
+            )
+
+        response.raise_for_status()
+
+        # Avoid saving an HTML error page as a CSV.
+        if "text/html" in response.headers.get("Content-Type", "").lower():
+            raise RuntimeError(
+                f"{year}: the server returned HTML instead of CSV data."
+            )
+
+        csv_path.write_bytes(response.content)
+        print("Saved to:", csv_path)
+
     raw_df = pd.read_csv(
         csv_path,
-        dtype = str,
-        keep_default_na = False # Prevent empty strings from being convert to NaN
+        dtype=str,
+        keep_default_na=False
     )
 
-    if raw_df.empty or not raw_df["activity_year"].eq(str(year)).all():
-        raise ValueError(f"The downloaded CSV does not contain the expected {year} data.")
+    # Verify that the file matches the requested data.
+    required_columns = {"activity_year", "state_code", "loan_purpose"}
+    missing = required_columns - set(raw_df.columns)
+
+    if missing:
+        raise ValueError(
+            f"{csv_path.name} is missing columns: {sorted(missing)}"
+        )
+
+    if raw_df.empty:
+        raise ValueError(f"{csv_path.name} contains no observations.")
+
+    if not (
+        raw_df["activity_year"].eq(str(year)).all()
+        and raw_df["state_code"].eq("RI").all()
+        and raw_df["loan_purpose"].eq("1").all()
+    ):
+        raise ValueError(
+            f"{csv_path.name} must contain only {year} "
+            "Rhode Island home-purchase applications."
+        )
 
     yearly_data.append(raw_df)
 
@@ -54,7 +85,7 @@ print('Rows and columns:', raw_df.shape)
 print('Column name:', raw_df.columns.tolist())
 
 needed_columns = [
-    "activity_year", # Retain for splitting; exclude from predictors
+    "activity_year",  
     "action_taken",
     "loan_amount",
     "income",
@@ -65,7 +96,24 @@ needed_columns = [
     "occupancy_type",
     "construction_method",
     "total_units",
-    "loan_term"
+    "loan_term",
+    "county_code",
+    "lien_status",
+    "conforming_loan_limit",
+    "open-end_line_of_credit",
+    "business_or_commercial_purpose",
+    "interest_only_payment",
+    "balloon_payment",
+    "submission_of_application",
+    "aus-1",
+    "applicant_credit_score_type",
+    "co-applicant_credit_score_type",
+    "tract_population",
+    "tract_to_msa_income_percentage",
+    "tract_owner_occupied_units",
+    "tract_one_to_four_family_homes",
+    "tract_median_age_of_housing_units",
+    "lei"
 ]
 
 # Check for missing columns
@@ -98,7 +146,7 @@ print(df["denied"].value_counts().sort_index())
 print(f"\nDenial rate: {df['denied'].mean():.2%}") # Results in 2 decimal places and percentage format
 
 # Containing only the features uses for prediction, excluding the target and action_taken
-feature_df = df.drop(columns = ['activity_year', 'action_taken', 'denied'])
+feature_df = df.drop(columns=['action_taken', 'denied'])
 
 # Check for missing values, the result is true if any of the conditions is met, otherwise false
 unavilable = (
@@ -119,11 +167,17 @@ print(
 )
 
 numeric_features = [
+    'activity_year',
     'loan_amount',
     'income',
     'loan_to_value_ratio',
     'property_value',
-    'loan_term'
+    'loan_term',
+    'tract_population',
+    'tract_to_msa_income_percentage',
+    'tract_owner_occupied_units',
+    'tract_one_to_four_family_homes',
+    'tract_median_age_of_housing_units'
 ]
 
 categorical_features = [
@@ -131,7 +185,19 @@ categorical_features = [
     "loan_type",
     "occupancy_type",
     "construction_method",
-    "total_units"
+    "total_units",
+    "county_code",
+    "lien_status",
+    "conforming_loan_limit",
+    "open-end_line_of_credit",
+    "business_or_commercial_purpose",
+    "interest_only_payment",
+    "balloon_payment",
+    "submission_of_application",
+    "aus-1",
+    "applicant_credit_score_type",
+    "co-applicant_credit_score_type",
+    "lei"
 ]
 
 for column in numeric_features:
@@ -154,60 +220,45 @@ print(df[categorical_features].dtypes)
 print("\nCategorical summary:")
 print(df[categorical_features].describe(include="all"))
 
-from sklearn.model_selection import train_test_split
-
 # The predictors are the numeric and categorical features, and the target is denied
 X = df[numeric_features + categorical_features].copy()
 y = df['denied'].copy()
 
-# Select the rows for each period. activity_year is a string column
-historical_rows = df['activity_year'].isin(['2018', '2019', '2020', '2021', '2022'])
-validation_rows = df['activity_year'] == '2023'
-test_2024_rows = df['activity_year'] == '2024'
+# Select the rows for each period
+train_rows = df['activity_year'].between(2018, 2023)
+test_rows = df['activity_year'] == 2024
 
-# Research 8-% of 2018-2022 as training, test hold the remaining 20%
-X_train, X_test, y_train, y_test = train_test_split(
-    X.loc[historical_rows], y.loc[historical_rows],
-    train_size = 0.80,
-    random_state = 42,
-    stratify = y.loc[historical_rows]
-)
+# Use all eligible 2018-2023 applications for training
+X_train = X.loc[train_rows].copy()
+y_train = y.loc[train_rows].copy()
 
-# Use all eligible 2023 applications for validation
-X_val = X.loc[validation_rows].copy()
-y_val = y.loc[validation_rows].copy()
-
-# Use all eligible 2024 applications for the second test set
-X_test_2024 = X.loc[test_2024_rows].copy()
-y_test_2024 = y.loc[test_2024_rows].copy()
+# Use all eligible 2024 applications for testing
+X_test = X.loc[test_rows].copy()
+y_test = y.loc[test_rows].copy()
 
 for name, X_part, y_part in [
-    ("Training", X_train, y_train),
-    ("Validation (2023)", X_val, y_val),
-    ("Historical test (2018-2022)", X_test, y_test),
-    ("Later-period test (2024)", X_test_2024, y_test_2024)
+    ("Training (2018-2023)", X_train, y_train),
+    ("Test (2024)", X_test, y_test)
 ]:
     print(
         f"{name}: {len(X_part)} rows, "
         f"denial rate: {y_part.mean():.2%}"
-    ) # Check the rows and denial rate for each split 
+    )  # Check the rows and denial rate for each split
 
 for name, X_part, y_part in [
     ("train", X_train, y_train),
-    ("validation", X_val, y_val),
-    ("test", X_test, y_test),
-    ("test_2024", X_test_2024, y_test_2024)
+    ("test", X_test, y_test)
 ]:
     split_df = X_part.copy()
     split_df["denied"] = y_part
 
-    output_path = csv_path.parent / f"hmda_{name}.csv"
+    output_path = data_dir / f"hmda_{name}.csv"
     split_df.to_csv(output_path, index=False)
 
     print("Saved:", output_path)
 
 # Save the missing-value summary
 missing_summary.to_csv(
-    csv_path.parent / "hmda_missing_summary.csv",
+    data_dir / "hmda_missing_summary.csv",
     index_label="feature"
 )
